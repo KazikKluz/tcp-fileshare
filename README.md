@@ -6,7 +6,7 @@ A small application for sharing files over TCP.
 
 - [Overview](#overview)
   - [The Challenge](#the-challenge)
-  - [The Challenge](#build-with)
+  - [Build With](#build-with)
 - [Author](#author)
 
 ## Overview
