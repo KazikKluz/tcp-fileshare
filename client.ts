@@ -1,10 +1,19 @@
 import net from 'net';
 import { createReadStream } from 'fs';
 import { basename } from 'path';
+import { randomBytes, createCipheriv } from 'crypto';
+import { pipeline } from 'stream';
+import { Socket } from 'dgram';
 
-const filenames = process.argv.slice(2).map((filename) => basename(filename));
+//TODO create 16bits long iv
+// [] sdkfsldkjf
+const userInput = process.argv.slice(2);
+const password = userInput.pop();
+const filenames = userInput.map((filename) => basename(filename));
 
 const client = net.connect(3000, '127.0.0.1', () => {
+  const iv = randomBytes(16);
+  let password = 'Kazik';
   let done = 0;
 
   filenames.forEach((filename) => {
@@ -35,7 +44,11 @@ const client = net.connect(3000, '127.0.0.1', () => {
           // console.log(outBuff.length);
           // console.log(outBuff);
 
-          client.write(outBuff);
+          const first = Buffer.from(
+            createCipheriv('aes-128-ccm', password, outBuff)
+          );
+          const finalBuff = Buffer.concat([iv, first]);
+          client.write(first);
         }
       })
       .on('end', () => {
