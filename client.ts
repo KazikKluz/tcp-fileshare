@@ -2,8 +2,6 @@ import net from 'net';
 import { createReadStream } from 'fs';
 import { basename } from 'path';
 import { randomBytes, createCipheriv } from 'crypto';
-import { pipeline } from 'stream';
-import { Socket } from 'dgram';
 
 //TODO create 16bits long iv
 // [] sdkfsldkjf
@@ -13,7 +11,6 @@ const filenames = userInput.map((filename) => basename(filename));
 
 const client = net.connect(3000, '127.0.0.1', () => {
   const iv = randomBytes(16);
-  let password = 'Kazik';
   let done = 0;
 
   filenames.forEach((filename) => {
@@ -41,14 +38,17 @@ const client = net.connect(3000, '127.0.0.1', () => {
           outBuff = Buffer.concat([outBuff, sizeBuff]);
 
           outBuff = Buffer.concat([outBuff, chunk]);
-          // console.log(outBuff.length);
-          // console.log(outBuff);
 
-          const first = Buffer.from(
-            createCipheriv('aes-128-ccm', password, outBuff)
-          );
-          const finalBuff = Buffer.concat([iv, first]);
-          client.write(first);
+          const passBuff = Buffer.alloc(16);
+          Buffer.from(password!).copy(passBuff);
+          console.log(iv);
+          const cipher = createCipheriv('aes-128-gcm', passBuff, iv);
+          const encryptedBuff = Buffer.concat([
+            cipher.update(outBuff),
+            cipher.final(),
+          ]);
+          outBuff = Buffer.concat([iv, encryptedBuff]);
+          client.write(outBuff);
         }
       })
       .on('end', () => {

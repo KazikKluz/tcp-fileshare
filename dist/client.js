@@ -14,7 +14,6 @@ const password = userInput.pop();
 const filenames = userInput.map((filename) => (0, path_1.basename)(filename));
 const client = net_1.default.connect(3000, '127.0.0.1', () => {
     const iv = (0, crypto_1.randomBytes)(16);
-    let password = 'Kazik';
     let done = 0;
     filenames.forEach((filename) => {
         // console.log(filename + ' !!');
@@ -34,11 +33,16 @@ const client = net_1.default.connect(3000, '127.0.0.1', () => {
                 sizeBuff.writeUInt32BE(chunk.length);
                 outBuff = Buffer.concat([outBuff, sizeBuff]);
                 outBuff = Buffer.concat([outBuff, chunk]);
-                // console.log(outBuff.length);
-                // console.log(outBuff);
-                const first = Buffer.from((0, crypto_1.createCipheriv)('aes-128-ccm', password, outBuff));
-                const finalBuff = Buffer.concat([iv, first]);
-                client.write(first);
+                const passBuff = Buffer.alloc(16);
+                Buffer.from(password).copy(passBuff);
+                console.log(iv);
+                const cipher = (0, crypto_1.createCipheriv)('aes-128-gcm', passBuff, iv);
+                const encryptedBuff = Buffer.concat([
+                    cipher.update(outBuff),
+                    cipher.final(),
+                ]);
+                outBuff = Buffer.concat([iv, encryptedBuff]);
+                client.write(outBuff);
             }
         })
             .on('end', () => {

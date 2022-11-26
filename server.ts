@@ -1,6 +1,9 @@
 import net from 'net';
 import { createWriteStream } from 'fs';
 import { Buffer } from 'buffer';
+import { createDecipheriv } from 'crypto';
+
+const password = process.argv[2];
 
 net
   .createServer((socket) => {
@@ -10,6 +13,17 @@ net
     let buffer = Buffer.alloc(0);
 
     function processData() {
+      let iv = buffer.subarray(0, 16);
+
+      const passBuff = Buffer.alloc(16);
+      Buffer.from(password!).copy(passBuff);
+
+      const decipher = createDecipheriv('aes-128-gcm', passBuff, iv);
+      let chunk = Buffer.concat([decipher.update]);
+
+      //TODO move packet decryption to data event, and leave processing during
+      //pause and end event
+
       let chunk = buffer.subarray(0, 30);
       let filename: string = chunk.toString('utf-8').replace(/\0.*$/g, '');
       buffer = buffer.subarray(30);
@@ -46,7 +60,7 @@ net
       })
       .on('pause', () => {
         processData();
-        while (buffer.length > 32767) {
+        while (buffer.length > 40000) {
           processData();
         }
         socket.resume();
