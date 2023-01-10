@@ -1,21 +1,35 @@
 import net from 'net';
 import { createReadStream } from 'fs';
 import { basename } from 'path';
-import { randomBytes, createCipheriv } from 'crypto';
+import { createCipheriv, randomBytes } from 'crypto';
 
-//TODO create 16bits long iv
-// [] sdkfsldkjf
 const userInput = process.argv.slice(2);
-const password = userInput.pop();
+
+const passBuff = Buffer.alloc(32);
+Buffer.from(userInput.pop()!).copy(passBuff);
+
 const filenames = userInput.map((filename) => basename(filename));
+//const iv = Buffer.from('6bbc47a2756d6d6b6bbc47a2756d6d6b', 'hex');
+
+const iv = Buffer.from(randomBytes(32).toString(), 'hex');
+console.log(iv);
+
+let cipher = createCipheriv('aes-256-cbc', passBuff, iv);
 
 const client = net.connect(3000, '127.0.0.1', () => {
-  const iv = randomBytes(16);
   let done = 0;
 
-  filenames.forEach((filename) => {
-    // console.log(filename + ' !!');
+  cipher.on('readable', () => {
+    let codChunk;
+    if (null !== (codChunk = cipher.read())) {
+      client.write(Buffer.concat([iv, codChunk]));
+    }
+    while (null !== (codChunk = cipher.read())) {
+      client.write(codChunk);
+    }
+  });
 
+  filenames.forEach((filename) => {
     const readStream = createReadStream(filename, {
       highWaterMark: 32 * 1024 - 1,
     })
@@ -23,7 +37,6 @@ const client = net.connect(3000, '127.0.0.1', () => {
         let chunk: Buffer;
 
         while ((chunk = readStream.read()) !== null) {
-          //  console.log(chunk.length);
           let outBuff = Buffer.alloc(0);
 
           const nameBuff = Buffer.alloc(30);
@@ -39,16 +52,7 @@ const client = net.connect(3000, '127.0.0.1', () => {
 
           outBuff = Buffer.concat([outBuff, chunk]);
 
-          const passBuff = Buffer.alloc(16);
-          Buffer.from(password!).copy(passBuff);
-          console.log(iv);
-          const cipher = createCipheriv('aes-128-gcm', passBuff, iv);
-          const encryptedBuff = Buffer.concat([
-            cipher.update(outBuff),
-            cipher.final(),
-          ]);
-          outBuff = Buffer.concat([iv, encryptedBuff]);
-          client.write(outBuff);
+          cipher.write(outBuff);
         }
       })
       .on('end', () => {

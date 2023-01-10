@@ -1,36 +1,27 @@
 import net from 'net';
 import { createWriteStream } from 'fs';
 import { Buffer } from 'buffer';
-import { createDecipheriv } from 'crypto';
+import { Cipher, createDecipheriv, Decipher } from 'crypto';
 
-const password = process.argv[2];
+const passBuff = Buffer.alloc(32);
+Buffer.from(process.argv[2]!).copy(passBuff);
+
+let decipher: Decipher;
 
 net
   .createServer((socket) => {
-    console.log('file transfer');
+    console.log('file transfer...');
 
     const writeMap = new Map();
     let buffer = Buffer.alloc(0);
 
     function processData() {
-      let iv = buffer.subarray(0, 16);
-
-      const passBuff = Buffer.alloc(16);
-      Buffer.from(password!).copy(passBuff);
-
-      const decipher = createDecipheriv('aes-128-gcm', passBuff, iv);
-      let chunk = Buffer.concat([decipher.update]);
-
-      //TODO move packet decryption to data event, and leave processing during
-      //pause and end event
-
       let chunk = buffer.subarray(0, 30);
       let filename: string = chunk.toString('utf-8').replace(/\0.*$/g, '');
       buffer = buffer.subarray(30);
 
       chunk = buffer.subarray(0, 16);
       let datasize = chunk.readUInt32BE();
-      console.log(`2 ${datasize}`);
       buffer = buffer.subarray(16);
       chunk = buffer.subarray(0, datasize);
 
@@ -52,14 +43,27 @@ net
     }
 
     socket
+      .once('data', (chunk) => {
+        const iv = chunk.subarray(0, 32);
+        chunk = chunk.subarray(32);
+
+        decipher = createDecipheriv('aes-256-cbc', passBuff, iv);
+
+        decipher.on('readable', () => {
+          let decChunk;
+          while (null !== (decChunk = decipher.read())) {
+            buffer = Buffer.concat([buffer, decChunk]);
+          }
+        });
+      })
       .on('data', (chunk) => {
-        buffer = Buffer.concat([buffer, chunk]);
+        decipher.write(chunk);
+
         if (buffer.length > 3000000) {
           socket.pause();
         }
       })
       .on('pause', () => {
-        processData();
         while (buffer.length > 40000) {
           processData();
         }
