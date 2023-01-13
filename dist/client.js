@@ -6,9 +6,17 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const net_1 = __importDefault(require("net"));
 const fs_1 = require("fs");
 const path_1 = require("path");
+const crypto_1 = require("crypto");
 const filenames = process.argv.slice(2).map((filename) => (0, path_1.basename)(filename));
 const client = net_1.default.connect(3000, '127.0.0.1', () => {
     let done = 0;
+    const cipher = (0, crypto_1.createCipheriv)('aes-256-cbc', '00000000001111111111222222222233', Buffer.from('0000000000111111'));
+    cipher.on('readable', () => {
+        let codChunk;
+        while (null !== (codChunk = cipher.read())) {
+            client.write(codChunk);
+        }
+    });
     filenames.forEach((filename) => {
         // console.log(filename + ' !!');
         const readStream = (0, fs_1.createReadStream)(filename, {
@@ -27,9 +35,7 @@ const client = net_1.default.connect(3000, '127.0.0.1', () => {
                 sizeBuff.writeUInt32BE(chunk.length);
                 outBuff = Buffer.concat([outBuff, sizeBuff]);
                 outBuff = Buffer.concat([outBuff, chunk]);
-                // console.log(outBuff.length);
-                // console.log(outBuff);
-                client.write(outBuff);
+                cipher.write(outBuff);
             }
         })
             .on('end', () => {

@@ -1,11 +1,26 @@
 import net from 'net';
 import { createReadStream } from 'fs';
 import { basename } from 'path';
+import { createCipheriv } from 'crypto';
 
 const filenames = process.argv.slice(2).map((filename) => basename(filename));
 
 const client = net.connect(3000, '127.0.0.1', () => {
   let done = 0;
+
+  const cipher = createCipheriv(
+    'aes-256-cbc',
+    '00000000001111111111222222222233',
+    Buffer.from('0000000000111111')
+  );
+
+  cipher.on('readable', () => {
+    let codChunk;
+
+    while (null !== (codChunk = cipher.read())) {
+      client.write(codChunk);
+    }
+  });
 
   filenames.forEach((filename) => {
     // console.log(filename + ' !!');
@@ -32,10 +47,8 @@ const client = net.connect(3000, '127.0.0.1', () => {
           outBuff = Buffer.concat([outBuff, sizeBuff]);
 
           outBuff = Buffer.concat([outBuff, chunk]);
-          // console.log(outBuff.length);
-          // console.log(outBuff);
 
-          client.write(outBuff);
+          cipher.write(outBuff);
         }
       })
       .on('end', () => {

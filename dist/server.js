@@ -6,11 +6,19 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const net_1 = __importDefault(require("net"));
 const fs_1 = require("fs");
 const buffer_1 = require("buffer");
+const crypto_1 = require("crypto");
 net_1.default
     .createServer((socket) => {
     console.log('file transfer');
     const writeMap = new Map();
     let buffer = buffer_1.Buffer.alloc(0);
+    const decipher = (0, crypto_1.createDecipheriv)('aes-256-cbc', '00000000001111111111222222222233', buffer_1.Buffer.from('0000000000111111'));
+    decipher.on('readable', () => {
+        let decChunk;
+        while (null !== (decChunk = decipher.read())) {
+            buffer = buffer_1.Buffer.concat([buffer, decChunk]);
+        }
+    });
     function processData() {
         let chunk = buffer.subarray(0, 30);
         let filename = chunk.toString('utf-8').replace(/\0.*$/g, '');
@@ -32,7 +40,7 @@ net_1.default
     }
     socket
         .on('data', (chunk) => {
-        buffer = buffer_1.Buffer.concat([buffer, chunk]);
+        decipher.write(chunk);
         if (buffer.length > 3000000) {
             socket.pause();
         }
